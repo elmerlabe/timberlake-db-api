@@ -7,8 +7,8 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 const port = process.env.PORT || 4000;
-const { Sequelize, where, Op } = require("sequelize");
-const sequelize = new Sequelize(process.env.DATABASE_URL);
+const { where, Op } = require("sequelize");
+const sequelize = require("./sequelize");
 
 app.use(express.json());
 app.use(cors());
