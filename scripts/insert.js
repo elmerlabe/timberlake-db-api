@@ -4,8 +4,7 @@ const fs = require("fs");
 const results = [];
 
 const { Owner } = require("../models");
-const { Sequelize } = require("sequelize");
-const sequelize = new Sequelize(process.env.DATABASE_URL);
+const sequelize = require("../sequelize");
 
 const insert = async () => {
   try {
