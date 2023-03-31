@@ -1,5 +1,5 @@
 require("dotenv").config();
-const { Owner, User } = require("./models");
+const { Owner, User, Property, PropertyOwner } = require("./models");
 
 const jwt = require("jsonwebtoken");
 const bycrypt = require("bcrypt");
@@ -79,32 +79,236 @@ app.post("/signup", async (req, res) => {
 });
 
 app.get("/getDatabaseSummary", validateToken, async (req, res) => {
-  const totalOwners = await Owner.count();
-  const totalVacant = await Owner.findAndCountAll({
-    where: { addressNumber: { [Op.iLike]: "vacant" } },
-  });
-  const totalReserved = await Owner.findAndCountAll({
-    where: {
-      [Op.or]: {
-        owner1Code: { [Op.iLike]: `%rsvd%` },
-        owner2Code: { [Op.iLike]: `%rsvd%` },
-      },
-    },
-  });
+  const totalOwners = await PropertyOwner.count();
+  const totalProperties = await Property.count();
 
   return res.json({
     totalOwners: totalOwners,
-    totalVacant: totalVacant.count,
-    totalReserved: totalReserved.count,
+    totalProperties: totalProperties,
   });
 });
 
 app.get("/getOwnersPerStreet/:street", validateToken, async (req, res) => {
   const street = req.params.street;
-  const { count } = await Owner.findAndCountAll({
-    where: { streetName: { [Op.iLike]: `%${street}%` } },
+  const totalOwnersPerStreet = await Property.count({
+    where: { address: { [Op.iLike]: `%${street}%` } },
   });
-  return res.json({ totalOwnersPerStreet: count });
+  return res.json({ totalOwnersPerStreet: totalOwnersPerStreet });
+});
+
+app.post("/addNewPropertyOwner", async (req, res) => {
+  const data = req.body;
+  const owners = data.owners;
+  const { address, city, state, zip, remarks } = data.property;
+  let cnt = 0;
+
+  try {
+    const newProperty = await Property.create({
+      address,
+      city,
+      state,
+      zip,
+      remarks,
+    });
+
+    for (const owner of owners) {
+      cnt++;
+      await PropertyOwner.create({
+        firstName: owner.firstName,
+        lastName: owner.lastName,
+        phone: owner.phone,
+        email: owner.email,
+        ownerOrder: cnt,
+        PropertyId: newProperty.id,
+      });
+    }
+    return res.json({ success: true, message: "New property owner added!" });
+  } catch (error) {
+    console.error(error);
+    return res.json({ success: false, message: error.message });
+  }
+});
+
+app.put("/updatePropertyOwner/:id", validateToken, async (req, res) => {
+  const propertyId = parseInt(req.params.id);
+  const data = req.body;
+
+  try {
+    const property = await Property.findByPk(propertyId);
+
+    property.update(data.property);
+
+    for (const owner of data.owners) {
+      const pId = parseInt(owner.id);
+
+      // Add new owner if id not exist
+      if (!pId) {
+        await PropertyOwner.create({
+          firstName: owner.firstName,
+          lastName: owner.lastName,
+          phone: owner.phone,
+          email: owner.email,
+          ownerOrder: data.owners.length,
+          PropertyId: property.id,
+        });
+      } else {
+        await PropertyOwner.update(
+          {
+            firstName: owner.firstName,
+            lastName: owner.lastName,
+            phone: owner.phone,
+            email: owner.email,
+          },
+          {
+            where: {
+              id: pId,
+            },
+          }
+        );
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "Successfully updated!",
+    });
+  } catch (error) {
+    console.error(error);
+    return res.json({ success: false, message: error.message });
+  }
+});
+
+app.delete("/deletePropertyOwner/:id", validateToken, async (req, res) => {
+  const id = req.params.id;
+
+  try {
+    await PropertyOwner.destroy({ where: { id: id } });
+    return res.json({ message: "Successfully deleted" });
+  } catch (error) {
+    console.error(error);
+    return res.json({ success: false, message: error.message });
+  }
+});
+
+app.delete(
+  "/deleteAPropertyRecords/:propertyId",
+  validateToken,
+  async (req, res) => {
+    const propertyId = req.params.propertyId;
+
+    try {
+      const property = await Property.findByPk(propertyId, {
+        include: PropertyOwner,
+      });
+      property.destroy();
+
+      return res.json({ message: "Successfully deleted" });
+    } catch (error) {
+      return res.json({ message: error.message });
+    }
+  }
+);
+
+app.get("/getPropertyById/:id", validateToken, async (req, res) => {
+  const propertyId = req.params.id;
+  const property = await Property.findOne({
+    where: { id: propertyId },
+    include: PropertyOwner,
+  });
+
+  return res.json({ property: property });
+});
+
+app.get("/search", validateToken, async (req, res) => {
+  if (!req.query.limit && !req.query.page) {
+    return res.json({ success: false, message: "Lacking query parameters" });
+  }
+
+  const limit = parseInt(req.query.limit);
+  const page = parseInt(req.query.page);
+  const offset = page * limit;
+  const q = req.query.q;
+  const sel = req.query.sel;
+  let where1 = {};
+  let where2 = {};
+
+  if (sel === "name") {
+    where1 = {
+      [Op.or]: [
+        { firstName: { [Op.iLike]: `%${q}%` } },
+        { lastName: { [Op.iLike]: `%${q}%` } },
+        { phone: { [Op.iLike]: `%${q}%` } },
+        { email: { [Op.iLike]: `%${q}%` } },
+      ],
+    };
+    where2 = {};
+  } else if (sel === "address") {
+    where2 = {
+      [Op.or]: [
+        { address: { [Op.iLike]: `%${q}%` } },
+        { city: { [Op.iLike]: `%${q}%` } },
+        { state: { [Op.iLike]: `%${q}%` } },
+        { zip: { [Op.iLike]: `%${q}%` } },
+      ],
+    };
+    where1 = {};
+  }
+
+  const properties = await Property.findAndCountAll({
+    limit,
+    offset,
+    where: where2,
+    include: [
+      {
+        model: PropertyOwner,
+        attributes: ["id", "firstName", "lastName", "phone", "email"],
+        where: where1,
+      },
+    ],
+  });
+
+  //return res.json({ success: false, message: "Invalid request" });
+
+  return res.json(properties);
+});
+
+app.get("/getPropertyOwners", validateToken, async (req, res) => {
+  const limit = parseInt(req.query.limit);
+  const page = parseInt(req.query.page);
+  const ownerOrder = 1;
+  const offset = page * limit;
+  const street = req.query.street;
+  const state = req.query.state;
+  const city = req.query.city;
+  const search = req.query.search;
+
+  if (limit && page >= 0) {
+    let where = {
+      address: {
+        [Op.iLike]: `%${street}%`,
+      },
+      state: { [Op.iLike]: state },
+      city: { [Op.iLike]: city },
+    };
+
+    !street ? delete where.address : null;
+    !state ? delete where.state : null;
+    !city ? delete where.city : null;
+    //!search ? delete where[0] : null;
+
+    const properties = await Property.findAll({
+      limit,
+      offset,
+      where,
+      include: [{ model: PropertyOwner }],
+    });
+
+    const ttlProperties = await Property.count({ where: where });
+
+    return res.json({ count: ttlProperties, properties: properties });
+  } else {
+    return res.json({ success: false, message: "Invalid request" });
+  }
 });
 
 app.get("/getOwnersData", validateToken, async (req, res) => {
@@ -153,60 +357,6 @@ app.get("/getOwnersData", validateToken, async (req, res) => {
     return res.json({ owners: owners });
   } else {
     return res.json({ message: "Invalid request" });
-  }
-});
-
-app.get("/getOwnersDataById/:id", validateToken, async (req, res) => {
-  const id = req.params.id;
-
-  const owner = await Owner.findAll({
-    where: {
-      id: id,
-    },
-  });
-  return res.json(owner);
-});
-
-app.delete("/deleteOwnerById/:id", validateToken, async (req, res) => {
-  const id = req.params.id;
-
-  try {
-    Owner.destroy({
-      where: {
-        id: id,
-      },
-    });
-    return res.json({ message: "Records has been deleted.", success: true });
-  } catch (e) {
-    return res.json({ message: e, success: false });
-  }
-});
-
-app.post("/addNewOwner", validateToken, async (req, res) => {
-  const owner = req.body.data;
-
-  try {
-    await Owner.bulkCreate([owner]);
-    return res.json({ message: "Successfully added!", success: true });
-  } catch (error) {
-    console.log(error);
-    return res.json({ message: error });
-  }
-});
-
-app.put("/updateOwner/:id", validateToken, async (req, res) => {
-  const id = req.params.id;
-  const data = req.body.data;
-
-  try {
-    await Owner.update(data, {
-      where: {
-        id: id,
-      },
-    });
-    return res.json({ result: true, message: "Successfully updated!" });
-  } catch (e) {
-    return res.json({ message: e });
   }
 });
 
@@ -272,8 +422,7 @@ async function validateToken(req, res, next) {
 const startApp = async () => {
   try {
     await sequelize.authenticate();
-    await Owner.sync({ alter: true });
-    await User.sync({ alter: true });
+    await sequelize.sync({ alter: true });
 
     app.listen(port, () =>
       console.log(`Server running. Listening on port ${port}`)

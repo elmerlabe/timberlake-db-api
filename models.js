@@ -16,6 +16,7 @@ const User = sequelize.define("User", {
   },
 });
 
+//Original data backup
 const Owner = sequelize.define("Owner", {
   addressNumber: DataTypes.STRING,
   dir: DataTypes.STRING,
@@ -35,4 +36,25 @@ const Owner = sequelize.define("Owner", {
   remarks: DataTypes.STRING,
 });
 
-module.exports = { Owner, User };
+// Property
+const Property = sequelize.define("Properties", {
+  address: DataTypes.STRING,
+  city: DataTypes.STRING,
+  state: DataTypes.STRING,
+  zip: DataTypes.STRING,
+  remarks: DataTypes.STRING,
+});
+
+// Owner
+const PropertyOwner = sequelize.define("PropertyOwner", {
+  firstName: DataTypes.STRING,
+  lastName: DataTypes.STRING,
+  phone: DataTypes.STRING,
+  email: DataTypes.STRING,
+  ownerOrder: DataTypes.INTEGER,
+});
+
+Property.hasMany(PropertyOwner);
+PropertyOwner.belongsTo(Property);
+
+module.exports = { Owner, User, Property, PropertyOwner };
