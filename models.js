@@ -5,6 +5,7 @@ const User = sequelize.define("User", {
   username: {
     type: DataTypes.STRING,
     allowNull: false,
+    unique: "username",
   },
   password: {
     type: DataTypes.STRING,
@@ -36,8 +37,12 @@ const Owner = sequelize.define("Owner", {
   remarks: DataTypes.STRING,
 });
 
-// Property
-const Property = sequelize.define("Properties", {
+// Owner
+const PropertyOwner = sequelize.define("PropertyOwner", {
+  firstName: DataTypes.STRING,
+  lastName: DataTypes.STRING,
+  phone: DataTypes.STRING,
+  email: DataTypes.STRING,
   address: DataTypes.STRING,
   city: DataTypes.STRING,
   state: DataTypes.STRING,
@@ -45,16 +50,15 @@ const Property = sequelize.define("Properties", {
   remarks: DataTypes.STRING,
 });
 
-// Owner
-const PropertyOwner = sequelize.define("PropertyOwner", {
+const SubOwner = sequelize.define("SubOwner", {
   firstName: DataTypes.STRING,
   lastName: DataTypes.STRING,
   phone: DataTypes.STRING,
   email: DataTypes.STRING,
-  ownerOrder: DataTypes.INTEGER,
+  ownerOrder: { type: DataTypes.INTEGER, allowNull: false },
 });
 
-Property.hasMany(PropertyOwner);
-PropertyOwner.belongsTo(Property);
+PropertyOwner.hasMany(SubOwner);
+SubOwner.belongsTo(PropertyOwner);
 
-module.exports = { Owner, User, Property, PropertyOwner };
+module.exports = { Owner, User, PropertyOwner, SubOwner };

@@ -1,4 +1,4 @@
-const { Owner, PropertyOwner, Property } = require("../models");
+const { Owner, PropertyOwner, SubOwner } = require("../models");
 const sequelize = require("../sequelize");
 
 const copyOwnersTable = async () => {
@@ -7,14 +7,17 @@ const copyOwnersTable = async () => {
     await sequelize.sync({ alter: true });
 
     const owners = await Owner.findAll();
-    const properties = [];
-    const owner1 = [];
-    const owner2 = [];
+    const propertyOwners = [];
+    const subOwners = [];
     let cnt = 0;
 
     for (const owner of owners) {
       cnt++;
-      properties.push({
+      propertyOwners.push({
+        firstName: owner.firstNameOwner1.toLowerCase(),
+        lastName: owner.lastName.toLowerCase(),
+        phone: owner.owner1Telephone,
+        email: owner.owner1Email.toLowerCase(),
         address:
           owner.addressNumber === "Vacant"
             ? owner.dir + " " + owner.streetName.toLowerCase()
@@ -29,36 +32,25 @@ const copyOwnersTable = async () => {
         remarks: owner.addressNumber === "Vacant" ? "Vacant" : "",
       });
 
-      //Owner 1
-      owner1.push({
-        firstName: owner.firstNameOwner1.toLowerCase(),
-        lastName: owner.lastName.toLowerCase(),
-        phone: owner.owner1Telephone,
-        email: owner.owner1Email.toLowerCase(),
-        ownerOrder: 1,
-        PropertyId: cnt,
-      });
-
-      // Owner2
+      // Sub Owner
       const owner2Name = owner.firstNameOwner2.toLowerCase();
       const owner2Email = owner.owner2Email.toLowerCase();
       const owner2Phone = owner.owner2Telephone;
 
       if (owner2Name.length >= 1 || owner2Email.length >= 1) {
-        owner2.push({
+        subOwners.push({
           firstName: owner2Name,
           lastName: "",
           phone: owner2Phone,
           email: owner2Email,
-          ownerOrder: 2,
-          PropertyId: cnt,
+          ownerOrder: 1,
+          PropertyOwnerId: cnt,
         });
       }
     }
 
-    await Property.bulkCreate(properties);
-    await PropertyOwner.bulkCreate(owner1);
-    await PropertyOwner.bulkCreate(owner2);
+    await PropertyOwner.bulkCreate(propertyOwners);
+    await SubOwner.bulkCreate(subOwners);
 
     console.log("Data successfully copied!");
   } catch (error) {
