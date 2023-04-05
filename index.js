@@ -80,11 +80,10 @@ app.post("/signup", async (req, res) => {
 
 app.get("/getDatabaseSummary", validateToken, async (req, res) => {
   const totalOwners = await PropertyOwner.count();
-  const subOwners = await SubOwner.count();
+  //const subOwners = await SubOwner.count();
 
   return res.json({
-    totalOwners: totalOwners + subOwners,
-    totalProperties: totalOwners,
+    totalOwners: totalOwners,
   });
 });
 
