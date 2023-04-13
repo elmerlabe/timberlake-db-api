@@ -241,39 +241,21 @@ app.get("/search", validateToken, async (req, res) => {
   const page = parseInt(req.query.page);
   const offset = page * limit;
   const q = req.query.q;
-  const sel = req.query.sel;
-  let where = {};
 
-  if (sel === "name") {
-    where = {
-      [Op.or]: [
-        { firstName: { [Op.iLike]: `%${q}%` } },
-        { lastName: { [Op.iLike]: `%${q}%` } },
-        { phone: { [Op.iLike]: `%${q}%` } },
-        { email: { [Op.iLike]: `%${q}%` } },
-      ],
-    };
-  } else if (sel === "address") {
-    where = {
-      [Op.or]: [
-        { address: { [Op.iLike]: `%${q}%` } },
-        { city: { [Op.iLike]: `%${q}%` } },
-        { state: { [Op.iLike]: `%${q}%` } },
-        { zip: { [Op.iLike]: `%${q}%` } },
-      ],
-    };
-  }
+  let where = {
+    [Op.or]: [
+      { firstName: { [Op.iLike]: `%${q}%` } },
+      { lastName: { [Op.iLike]: `%${q}%` } },
+      { phone: { [Op.iLike]: `%${q}%` } },
+      { email: { [Op.iLike]: `%${q}%` } },
+      { address: { [Op.iLike]: `%${q}%` } },
+    ],
+  };
 
   const propertyOwners = await PropertyOwner.findAndCountAll({
     limit,
     offset,
     where: where,
-    //include: [
-    //  {
-    //    model: SubOwner,
-    //    attributes: ["id", "firstName", "lastName", "phone", "email"],
-    //  },
-    //],
   });
 
   //return res.json({ success: false, message: "Invalid request" });
